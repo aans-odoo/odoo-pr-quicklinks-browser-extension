@@ -52,6 +52,64 @@
     return { taskId, runbotErrorId };
   }
 
+  function applyCommitMessageGuides() {
+    const selectors = [
+      '.extended-commit-description-container',
+    ];
+
+    const seen = new WeakSet();
+
+    for (const selector of selectors) {
+      document.querySelectorAll(selector).forEach((el) => {
+        if (seen.has(el)) return;
+        seen.add(el);
+
+        const commitContext = el.closest('.TimelineItem, .js-timeline-item, .js-commit-row, .commit, [data-component="commit-row"], .prc-Timeline-TimelineBody-tjOtb');
+        if (!commitContext) return;
+
+        const text = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
+        if (!text || text.length < 20) return;
+
+        const looksLikeCommitMessage =
+          /This commit adds:|Task-|website_blog|website_event|website_sale|website_hr_recruitment|website_event_track/i.test(text) ||
+          /\[IMP\]|\*:\s*website_/.test(text);
+
+        if (!looksLikeCommitMessage) return;
+
+        if (el.hasAttribute('data-commit-guide')) return;
+
+        const guide = document.createElement('div');
+        guide.setAttribute('data-commit-guide', 'true');
+        guide.setAttribute('aria-hidden', 'true');
+        guide.style.cssText = `
+          position: absolute;
+          top: 0;
+          bottom: 0;
+          left: 72ch;
+          width: 1px;
+          background: rgba(96, 165, 250, 0.7);
+          pointer-events: none;
+          box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.2);
+          z-index: 2;
+        `;
+
+        const baseStyle = window.getComputedStyle(el);
+        if (baseStyle.position === 'static') {
+          el.style.position = 'relative';
+        }
+
+        if (text.length > 72) {
+          guide.style.background = 'rgba(248, 113, 113, 0.9)';
+          guide.style.boxShadow = '0 0 0 1px rgba(248, 113, 113, 0.25)';
+        }
+
+        if (!el.querySelector('[data-commit-guide="true"]')) {
+          el.appendChild(guide);
+        }
+      });
+    }
+  }
+
   function createButton({ attr, title, svgPath, color, onClick }) {
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -237,6 +295,8 @@
 
   function injectButtons() {
     document.querySelectorAll('[' + ATTR + ']').forEach(el => el.remove());
+
+    applyCommitMessageGuides();
 
     let branchName = getBranchNameFromPage();
     const { taskId, runbotErrorId } = findIds();
