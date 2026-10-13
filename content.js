@@ -115,6 +115,7 @@
     btn.type = 'button';
     btn.setAttribute(ATTR, attr);
     btn.setAttribute('aria-label', title);
+    btn.setAttribute('title', title);
 
     btn.style.cssText = `
       display: inline-flex;
@@ -130,41 +131,17 @@
       transition: background 0.15s, color 0.15s;
       vertical-align: middle;
       margin-left: 2px;
-      position: relative;
     `;
 
     btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16" fill="currentColor" style="vertical-align:text-bottom">${svgPath}</svg>`;
 
-    const tooltip = document.createElement('span');
-    tooltip.textContent = title;
-    tooltip.style.cssText = `
-      position: absolute;
-      bottom: calc(100% + 6px);
-      left: 50%;
-      transform: translateX(-50%);
-      background: #1b1f23;
-      color: #fff;
-      font-size: 11px;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-      padding: 4px 8px;
-      border-radius: 6px;
-      white-space: nowrap;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.15s;
-      z-index: 9999;
-    `;
-    btn.appendChild(tooltip);
-
     btn.addEventListener('mouseenter', () => {
       btn.style.color = color || 'inherit';
       btn.style.background = 'var(--bgColor-neutral-muted, rgba(175,184,193,0.2))';
-      tooltip.style.opacity = '1';
     });
     btn.addEventListener('mouseleave', () => {
       btn.style.color = 'inherit';
       btn.style.background = 'transparent';
-      tooltip.style.opacity = '0';
     });
 
     btn.addEventListener('click', async (e) => {
@@ -184,13 +161,8 @@
           document.body.removeChild(ta);
         }
       }
-      const originalText = tooltip.textContent;
-      tooltip.textContent = successMsg;
       btn.style.color = successColor;
-      setTimeout(() => {
-        tooltip.textContent = originalText;
-        btn.style.color = 'inherit';
-      }, 1500);
+      setTimeout(() => { btn.style.color = 'inherit'; }, 1500);
     });
 
     return btn;
