@@ -281,11 +281,11 @@
 
     if (!branchName) return;
 
-    const prStickyHeader = document.querySelector('[class*="StickyPullRequestHeader-module__prHeader"]');
+    const prStickyHeader = document.querySelector('[class*="StickyPullRequestHeader-module__prHeader"], [class*="stickyHeader__"]');
     if (prStickyHeader) injectIntoRoot(prStickyHeader, branchName, taskId, runbotErrorId);
 
-    const filesToolbar = document.querySelector('[class*="PullRequestFilesToolbar-module__toolbar"]');
-    if (filesToolbar) injectIntoRoot(filesToolbar, branchName, taskId, runbotErrorId);
+    const filesToolbar = document.querySelector('[class*="PullRequestFilesToolbar-module__toolbar"], [class*="toolbar__"][data-component="Stack"]');
+    if (filesToolbar && filesToolbar !== prStickyHeader) injectIntoRoot(filesToolbar, branchName, taskId, runbotErrorId);
   }
 
   injectButtons();
