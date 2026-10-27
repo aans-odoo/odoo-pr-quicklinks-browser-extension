@@ -1,8 +1,12 @@
 (() => {
   const ATTR = 'data-branch-copy-injected';
+  const TOAST_ATTR = 'data-branch-copy-toast';
   const RUNBOT_SEARCH_URL = 'https://runbot.odoo.com/runbot/rd-1?search=';
   const TASK_URL = 'https://www.odoo.com/odoo/project/974/tasks/';
   const RUNBOT_ERROR_URL = 'https://runbot.odoo.com/odoo/error/';
+
+  const RESOLVED_THREAD_SELECTOR = 'review-thread-collapsible[data-resolved="true"]';
+  const THREAD_TOGGLE_SELECTOR = 'button[data-target="review-thread-collapsible.button"]';
 
   const TASK_REGEX = /\btask[#:\-_ ]?\s*(\d+)\b/i;
   const RUNBOT_ERROR_REGEX = /\brunbot[#:\-_ ]?\s*(\d+)\b/i;
@@ -110,7 +114,49 @@
     }
   }
 
-  function createButton({ attr, title, svgPath, color, onClick }) {
+  let toastEl = null;
+  let toastTimer = null;
+
+  function showToast(message, color) {
+    if (!toastEl || !toastEl.isConnected) {
+      toastEl = document.createElement('div');
+      toastEl.setAttribute(TOAST_ATTR, 'true');
+      toastEl.setAttribute('role', 'status');
+      toastEl.setAttribute('aria-live', 'polite');
+      toastEl.style.cssText = `
+        position: fixed;
+        bottom: 16px;
+        right: 16px;
+        transform: translateY(-8px);
+        padding: 8px 16px;
+        border: 1px solid var(--borderColor-default, #d0d7de);
+        border-left: 4px solid;
+        border-radius: 6px;
+        background: var(--overlay-bgColor, #ffffff);
+        color: var(--fgColor-default, #1f2328);
+        box-shadow: var(--shadow-floating-large, 0 8px 24px rgba(140,149,159,0.2));
+        font-size: 14px;
+        z-index: 2147483647;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.2s, transform 0.2s;
+      `;
+      document.body.appendChild(toastEl);
+    }
+
+    toastEl.textContent = message;
+    toastEl.style.borderLeftColor = color;
+    toastEl.style.opacity = '1';
+    toastEl.style.transform = 'translateY(0)';
+
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      toastEl.style.opacity = '0';
+      toastEl.style.transform = 'translateY(-8px)';
+    }, 2000);
+  }
+
+  function createButton({ attr, title, svgPath, color, onClick, toast = false }) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.setAttribute(ATTR, attr);
@@ -161,6 +207,7 @@
           document.body.removeChild(ta);
         }
       }
+      if (toast && successMsg) showToast(successMsg, successColor);
       btn.style.color = successColor;
       setTimeout(() => { btn.style.color = 'inherit'; }, 1500);
     });
@@ -178,6 +225,8 @@
 
   const RUNBOT_ERROR_SVG = `<path d="M4.47.22A.749.749 0 0 1 5 0h6c.199 0 .389.079.53.22l4.25 4.25c.141.14.22.331.22.53v6a.749.749 0 0 1-.22.53l-4.25 4.25A.749.749 0 0 1 11 16H5a.749.749 0 0 1-.53-.22L.22 11.53A.749.749 0 0 1 0 11V5c0-.199.079-.389.22-.53Zm.84 1.28L1.5 5.31v5.38l3.81 3.81h5.38l3.81-3.81V5.31L10.69 1.5ZM8 4a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 8 4Zm0 8a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"/>`;
 
+  const UNFOLD_SVG = `<path d="m8.177.677 2.896 2.896a.25.25 0 0 1-.177.427H8.75v1.25a.75.75 0 0 1-1.5 0V4H5.104a.25.25 0 0 1-.177-.427L7.823.677a.25.25 0 0 1 .354 0ZM7.25 10.75a.75.75 0 0 1 1.5 0V12h2.146a.25.25 0 0 1 .177.427l-2.896 2.896a.25.25 0 0 1-.354 0l-2.896-2.896A.25.25 0 0 1 5.104 12H7.25v-1.25Zm-5-2a.75.75 0 0 0 0-1.5h-.5a.75.75 0 0 0 0 1.5h.5ZM6 8a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1 0-1.5h.5A.75.75 0 0 1 6 8Zm2.25.75a.75.75 0 0 0 0-1.5h-.5a.75.75 0 0 0 0 1.5h.5ZM12 8a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1 0-1.5h.5A.75.75 0 0 1 12 8Zm2.25.75a.75.75 0 0 0 0-1.5h-.5a.75.75 0 0 0 0 1.5h.5Z"/>`;
+
   // ── Button factories ───────────────────────────────────────────────────────
 
   function createBranchCopyButton(branchName) {
@@ -186,6 +235,7 @@
       title: 'Copy branch name',
       svgPath: BRANCH_SVG,
       color: '#3fb950',
+      toast: true,
       onClick: () => ({ text: branchName, successMsg: '✓ Copied!', successColor: '#3fb950' }),
     });
   }
@@ -223,6 +273,48 @@
     });
   }
 
+  function getResolvedThreadToggles() {
+    return [...document.querySelectorAll(RESOLVED_THREAD_SELECTOR)]
+      .map(thread => thread.querySelector(THREAD_TOGGLE_SELECTOR))
+      .filter(Boolean);
+  }
+
+  function isAnyResolvedThreadCollapsed() {
+    return getResolvedThreadToggles().some(t => t.getAttribute('aria-expanded') !== 'true');
+  }
+
+  function resolvedToggleTitle() {
+    return isAnyResolvedThreadCollapsed() ? 'Expand all resolved comments' : 'Collapse all resolved comments';
+  }
+
+  function createExpandResolvedButton() {
+    const btn = createButton({
+      attr: 'expand-resolved',
+      title: resolvedToggleTitle(),
+      svgPath: UNFOLD_SVG,
+      color: '#58a6ff',
+      toast: true,
+      onClick: () => {
+        // Expand all if any is collapsed, otherwise collapse all
+        const expand = isAnyResolvedThreadCollapsed();
+        let count = 0;
+        for (const toggle of getResolvedThreadToggles()) {
+          const isExpanded = toggle.getAttribute('aria-expanded') === 'true';
+          if (isExpanded !== expand) {
+            toggle.click();
+            count++;
+          }
+        }
+        const title = expand ? 'Collapse all resolved comments' : 'Expand all resolved comments';
+        btn.setAttribute('title', title);
+        btn.setAttribute('aria-label', title);
+        const successMsg = `✓ ${expand ? 'Expanded' : 'Collapsed'} ${count} resolved comment${count === 1 ? '' : 's'}`;
+        return { text: '', successMsg, successColor: '#58a6ff' };
+      },
+    });
+    return btn;
+  }
+
   // ── Page scanning ──────────────────────────────────────────────────────────
 
   function getBranchNameFromPage() {
@@ -233,7 +325,7 @@
 
   // ── Injection ──────────────────────────────────────────────────────────────
 
-  function injectIntoRoot(root, branchName, taskId, runbotErrorId) {
+  function injectIntoRoot(root, branchName, taskId, runbotErrorId, hasResolvedThreads) {
     const copyBtns = root.querySelectorAll('button[data-component="IconButton"]:not([' + ATTR + '])');
     for (const btn of copyBtns) {
       const parent = btn.parentElement;
@@ -254,7 +346,8 @@
       if (!branchName) continue;
 
       // Insert right-to-left (afterend reverses order):
-      // Final visual order: [GH copy] [branch] [runbot search] [task?] [runbot error?]
+      // Final visual order: [GH copy] [branch] [runbot search] [task?] [runbot error?] [expand resolved?]
+      if (hasResolvedThreads) btn.insertAdjacentElement('afterend', createExpandResolvedButton());
       if (runbotErrorId) btn.insertAdjacentElement('afterend', createRunbotErrorButton(runbotErrorId));
       if (taskId)        btn.insertAdjacentElement('afterend', createTaskButton(taskId));
       btn.insertAdjacentElement('afterend', createRunbotSearchButton(branchName));
@@ -272,20 +365,21 @@
 
     let branchName = getBranchNameFromPage();
     const { taskId, runbotErrorId } = findIds();
+    const hasResolvedThreads = !!document.querySelector(RESOLVED_THREAD_SELECTOR);
 
     const mainHeader = document.querySelector('.prc-PageHeader-Description-w-ejP');
     if (mainHeader) {
-      const found = injectIntoRoot(mainHeader, branchName, taskId, runbotErrorId);
+      const found = injectIntoRoot(mainHeader, branchName, taskId, runbotErrorId, hasResolvedThreads);
       if (found) branchName = found;
     }
 
     if (!branchName) return;
 
     const prStickyHeader = document.querySelector('[class*="StickyPullRequestHeader-module__prHeader"], [class*="stickyHeader__"]');
-    if (prStickyHeader) injectIntoRoot(prStickyHeader, branchName, taskId, runbotErrorId);
+    if (prStickyHeader) injectIntoRoot(prStickyHeader, branchName, taskId, runbotErrorId, hasResolvedThreads);
 
     const filesToolbar = document.querySelector('[class*="PullRequestFilesToolbar-module__toolbar"], [class*="toolbar__"][data-component="Stack"]');
-    if (filesToolbar && filesToolbar !== prStickyHeader) injectIntoRoot(filesToolbar, branchName, taskId, runbotErrorId);
+    if (filesToolbar && filesToolbar !== prStickyHeader) injectIntoRoot(filesToolbar, branchName, taskId, runbotErrorId, hasResolvedThreads);
   }
 
   injectButtons();
@@ -293,7 +387,7 @@
   let debounceTimer = null;
   const observer = new MutationObserver((mutations) => {
     const relevant = mutations.some(m =>
-      Array.from(m.addedNodes).some(n => n.nodeType === 1 && !n.hasAttribute(ATTR))
+      Array.from(m.addedNodes).some(n => n.nodeType === 1 && !n.hasAttribute(ATTR) && !n.hasAttribute(TOAST_ATTR))
     );
     if (!relevant) return;
     clearTimeout(debounceTimer);
